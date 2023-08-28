@@ -19,7 +19,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(Options => Options.UseSqlSer
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = false)
                .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddScoped<IUserServices,UserService>();
-//Adding Athentication - JWT
+//Adding Athentication - JWT //Test
 builder.Services.Configure<JWT>
         (builder.Configuration.GetSection("JWT"));
 
