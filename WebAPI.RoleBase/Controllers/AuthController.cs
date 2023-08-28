@@ -1,107 +1,93 @@
 ﻿using Azure.Core;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RoleBase.DataBase.Model;
 using RoleBase.DataBase.Tables;
+using RoleBase.Services.Services.Interface;
 using System.Net;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace WebAPI.RoleBase.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<ApplicationUser> userManager;
-        private readonly SignInManager<ApplicationUser> signInManager;
+        private readonly IUserServices _userServices;
 
-        public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
+        public AuthController(IUserServices userServices)
         {
-            this.userManager = userManager;
-            this.signInManager = signInManager;
+            _userServices = userServices;
+        }
+
+        [HttpPost("Login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Login(UserVM model)
+        {
+            var result = await _userServices.LoginWithToken(model);
+            return StatusCode(StatusCodes.Status200OK, "token: " + result.Token);
         }
 
         [HttpPost]
         [Route("Registor")]
-        public async Task<IActionResult> Create([FromBody] Registor registor)
+        [AllowAnonymous]
+        public async Task<IActionResult> Create([FromBody] RegistorVM registor)
         {
             if (ModelState.IsValid)
             {
-                var userCheck = await userManager.FindByEmailAsync(registor.Email);
-                if(userCheck != null)
-                {
-                    return StatusCode(StatusCodes.Status502BadGateway, registor.Email + " is already created");
-                }
-                ApplicationUser _user = new ApplicationUser
-                {
-                    FirstName = registor.FirstName,
-                    LastName = registor.LastName,
-                    Email = registor.Email,
-                    PasswordHash = registor.Password,
-                };
-                IdentityResult result = await userManager.CreateAsync(_user);
-                if (result.Succeeded)
-                {
-                    return Ok("Created");
-                }
-                else
-                {
-                    return StatusCode(StatusCodes.Status502BadGateway, "Something went wrong");
-                }
+                var newRegistor = await _userServices.Registor(registor);
+                return StatusCode(StatusCodes.Status200OK, newRegistor.Message);
+            }
+            return StatusCode(StatusCodes.Status502BadGateway, "Something went wrong");
+
+        }
+
+        [HttpGet]
+        [Route("LogOut")]
+        public async Task<IActionResult> Logout()
+        {
+            await _userServices.LogOut();
+            return StatusCode(StatusCodes.Status200OK);
+        }
+
+        ///for Roles
+        [HttpGet]
+        [Route("GetRoles")]
+        public async Task<IActionResult> GetAll()
+        {
+            var roles = await _userServices.GetAllRole();
+            return StatusCode(StatusCodes.Status200OK, roles);
+        }
+
+        [HttpGet]
+        [Route("GetRolesById")]
+        public async Task<IActionResult> GetById([FromRoute] string name)
+        {
+            var roles = await _userServices.GetRoleByName(name);
+            return StatusCode(StatusCodes.Status200OK, roles);
+        }
+
+        [HttpPost]
+        [Route("addRole")]
+        public async Task<IActionResult> Role([FromBody] RolesVM model)
+        {
+            if (ModelState.IsValid)
+            {
+                var addRole = await _userServices.addRole(model);
+                return StatusCode(StatusCodes.Status502BadGateway, addRole.Message);
             }
             else
             {
                 return StatusCode(StatusCodes.Status502BadGateway, "Something went wrong");
             }
-            
         }
-        [HttpPost]
-        [Route("Login")]
-        public async Task<IActionResult> Login([FromBody] User model)
-        {
-            if (ModelState.IsValid)
-            {
-                var user = await userManager.FindByEmailAsync(model.Email);
-                
-                if (user == null)
-                {
-                    return StatusCode(StatusCodes.Status200OK, "User not found");
-                }
-
-                if (await userManager.CheckPasswordAsync(user, model.Password) == false)
-                {
-                    return StatusCode(StatusCodes.Status200OK, "Invalid credentials");
-
-                }
-
-                var result = await signInManager.PasswordSignInAsync(model.Email, model.Password,false,false);
-
-                if (result.Succeeded)
-                {
-                    await userManager.AddClaimAsync(user, new Claim("UserRole", "Admin"));
-                    return StatusCode(StatusCodes.Status200OK, "success");
-                }
-                else
-                {
-                    return StatusCode(StatusCodes.Status200OK, "Invalid login");
-                }
-            }
-            else
-            {
-                return StatusCode(StatusCodes.Status502BadGateway, "Please check username or password");
-            }
-        }
-
-        [HttpPost]
-        [Route("LoginOut")]
-        public async Task<IActionResult> Loginout()
-        {
-            await signInManager.SignOutAsync();
-            return StatusCode(StatusCodes.Status200OK);
-        }
-
     }
 }

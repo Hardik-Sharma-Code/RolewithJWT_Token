@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace RoleBase.DataBase.Model
 {
-    public class User
+    public class UserVM
     {
 
         [Required]
